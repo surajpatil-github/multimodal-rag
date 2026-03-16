@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: multimodal-rag-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: multimodal-rag-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+```
+
+---
+
+## File 4: `backend/.dockerignore`
+Create at `C:\Project\udemy\udemy\multimodal-rag\backend\.dockerignore`:
+```
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.git
+```
+
+---
+
+## File 5: `frontend/.dockerignore`
+Create at `C:\Project\udemy\udemy\multimodal-rag\frontend\.dockerignore`:
+```
+node_modules/
+.next/
+.env.local
+.git

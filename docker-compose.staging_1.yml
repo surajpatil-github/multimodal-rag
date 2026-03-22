@@ -1,0 +1,28 @@
+version: "3.9"
+
+# Overrides applied on top of docker-compose.yml for STAGING environment
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+
+services:
+
+  backend:
+    environment:
+      APP_ENV: staging
+    # Expose backend on a different port to avoid clashing with prod on same host
+    ports:
+      - "8001:8000"
+    # More aggressive restart policy for staging
+    restart: always
+
+  frontend:
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    ports:
+      - "3001:3000"
+    restart: always
+
+  nginx:
+    ports:
+      - "8080:80"   # staging nginx on 8080
+    volumes:
+      - ./nginx/nginx.staging.conf:/etc/nginx/nginx.conf:ro

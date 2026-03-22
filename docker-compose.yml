@@ -1,50 +1,72 @@
-version: '3.8'
+version: "3.9"
+
+# ── Shared defaults ───────────────────────────────────────────────────────────
+x-backend-env: &backend-env
+  OPENAI_API_KEY:       ${OPENAI_API_KEY}
+  TAVILY_API_KEY:       ${TAVILY_API_KEY}
+  PINECONE_API_KEY:     ${PINECONE_API_KEY}
+  PINECONE_TEXT_INDEX:  ${PINECONE_TEXT_INDEX}
+  PINECONE_IMAGE_INDEX: ${PINECONE_IMAGE_INDEX}
 
 services:
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
   backend:
+    image: ${DOCKERHUB_USER:-your-dockerhub-username}/multimodal-rag-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: multimodal-rag-backend
+      dockerfile: Dockerfile.backend
+    container_name: rag-backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      APP_ENV: production
     ports:
       - "8000:8000"
-    env_file:
-      - ./backend/.env
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - rag-network
 
+  # ── Next.js frontend ─────────────────────────────────────────────────────────
   frontend:
+    image: ${DOCKERHUB_USER:-your-dockerhub-username}/multimodal-rag-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: multimodal-rag-frontend
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://backend:8000
+    container_name: rag-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - rag-network
+
+  # ── Nginx reverse proxy ──────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: rag-nginx
     restart: unless-stopped
-```
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - rag-network
 
----
-
-## File 4: `backend/.dockerignore`
-Create at `C:\Project\udemy\udemy\multimodal-rag\backend\.dockerignore`:
-```
-venv/
-__pycache__/
-*.pyc
-*.pyo
-.env
-.git
-```
-
----
-
-## File 5: `frontend/.dockerignore`
-Create at `C:\Project\udemy\udemy\multimodal-rag\frontend\.dockerignore`:
-```
-node_modules/
-.next/
-.env.local
-.git
+networks:
+  rag-network:
+    driver: bridge
